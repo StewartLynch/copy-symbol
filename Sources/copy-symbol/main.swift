@@ -79,10 +79,28 @@ func main() {
 		exit(5)
 	}
 	
-	// Copy PNG to clipboard
-	let pb = NSPasteboard.general
-	pb.clearContents()
-	pb.setData(pngData, forType: .png)
+    // Write PNG to a temporary file and copy its URL to the pasteboard so Finder can paste it.
+    let sanitizedName: String = {
+        // Replace any characters that are not allowed in file names with hyphens
+        let invalid = CharacterSet(charactersIn: "/\\?%*|\"<>:").union(.newlines)
+        return symbolName.components(separatedBy: invalid).joined(separator: "-")
+    }()
+    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(sanitizedName).png")
+    do {
+        try pngData.write(to: tempURL, options: [.atomic])
+    } catch {
+        fputs("Error: failed to write temporary PNG file. \(error.localizedDescription)\n", stderr)
+        return
+    }
+    
+    // Put both a file URL (for Finder paste) and PNG data (for graphics apps) on the pasteboard.
+    let pb = NSPasteboard.general
+    pb.clearContents()
+    // 1) File URL enables ⌘V in Finder to create a file
+    pb.writeObjects([tempURL as NSURL])
+    // 2) PNG data preserves the ability to paste directly into graphics apps
+    pb.setData(pngData, forType: .png)
+
 	
 	print("Copied SF Symbol '\(symbolName)' as PNG \(finalWidth)×\(finalHeight) px (aspect preserved).")
 }
